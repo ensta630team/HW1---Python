@@ -1,13 +1,19 @@
-from source.models.timetools import AR
 import numpy as np
 
+from source.models.timetools import AR
+from source.utils.plot import plot_irf_comparison
+
 # Model instance
-ar_model = AR(p=1)
+H = 20
+p=20
+ar_model = AR(p=p)
 
-# Create F matrix
-F = ar_model.build_F(np.ones(10))
-print(F)
+F = ar_model.build_F()
 
-# Create F matrix (scalar testing)
-F = ar_model.build_F(np.ones(1))
-print(F)
+cond_0 = ar_model.is_stationary(F)
+
+irf_exact = ar_model.get_irf(H=H, F=F, method='exact')
+irf_simulation = ar_model.get_irf(H=H, F=F, 
+                                  method='simulation')
+
+plot_irf_comparison(irf_exact, irf_simulation, H)
