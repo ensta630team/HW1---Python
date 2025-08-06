@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt 
 import numpy as np
-
+import os
+plt.style.use('seaborn-v0_8-whitegrid')
 
 plt.rcParams.update({
     "text.usetex": True,
@@ -11,11 +12,10 @@ plt.rcParams.update({
     "text.latex.preamble": r"\usepackage{amsmath}" 
 })
 
-
-def plot_irf_comparison(irf_exact, irf_simulation, H):
+def plot_irf_comparison(irf_exact, irf_simulation, H, ax=None):
     periods = np.arange(H)
-    plt.style.use('seaborn-v0_8-whitegrid')
-    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+    if ax is None:
+        fig, ax = plt.subplots(1, 2, figsize=(12, 5))
 
     ax[0].plot(periods, irf_exact, 
             'o-',
@@ -44,10 +44,10 @@ def plot_irf_comparison(irf_exact, irf_simulation, H):
     ax[1].set_xlabel('Períodos (h)', fontsize=12)
     ax[1].set_ylabel('Diferencia de IRF \n(exacto - simulacion)', fontsize=12)
 
-    plt.savefig("./presentation/figures/irf_comparison.pdf", 
-                bbox_inches='tight',
-                dpi=300)    
-    plt.savefig("./presentation/figures/irf_comparison.png", 
-                bbox_inches='tight',
-                dpi=300)        
-    plt.show()
+    return ax
+
+def save_figure(figure, path, **kwargs):
+    dirpath = os.path.dirname(path)
+    os.makedirs(dirpath, exist_ok=True)
+    figure.savefig(path, bbox_inches='tight', dpi=300, **kwargs)  
+    print(f"✅ Succefully saved at {path}")
