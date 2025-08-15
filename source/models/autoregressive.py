@@ -1,66 +1,179 @@
 import numpy as np 
-from source.utils.random import generate_stationary_phi
+from source.utils.random import initialize_params
 
 
 class AR:
-    def __init__(self, p=1, params_distribution='stationary'):
+    def __init__(self, params_distribution=None, c=0.0, sigma=1.0, **kwargs):
         super().__init__()
-        self.p = p
-        self.phi = None # parameters
-        self.F = None # state space matrix
-        self.F_modules = None # F eigenvalues absolute value
-        self.stationary = None
-
-        if p is not None:
-            if params_distribution == 'uniform':
-                self.phi = np.random.normal(0, 
-                                            0.3, 
-                                            size=(1, self.p))
-            if params_distribution == 'stationary':
-                self.phi = generate_stationary_phi(self.p)
-        else:
-            self.phi = None
-
-    def set_F(self, F):
-        self.F = F
-
-    def set_phi(self, phi):
-        if phi is not None: 
-            self.p = len(phi)
-            self.phi = np.array(phi)
-
-    def build_F(self, phi=None):
-        F = np.eye(self.p-1, self.p)
-        F = np.vstack([self.phi, F])
-        self.set_F(F)
-        return F
+        self.c          = c # Intercept
+        self.sigma      = sigma # Standard deviation of the error term
+        self.F          = None # state space matrix
+        self.F_modules  = None # F eigenvalues absolute value
+        self.stationary = None # boolean if satisfies     
+        self.phi        = initialize_params(params_distribution, **kwargs)
+        self.p          = len(self.phi) if self.phi is not None else 0
+        self.mu         = self.get_unconditional_mean()
+        self.ustd       = self.get_unconditional_std()
     
-    def is_stationary(self, F=None):
-        if F is None: F = self.F
-        eigenvalues = np.linalg.eigvals(F)
-        modules = abs(eigenvalues)  
-        self.stationary = np.all(modules < 1)
-        return np.all(modules < 1), modules
+    def get_unconditional_mean(self):
+        """
+        Calculates the unconditional mean of the AR process.
+        The mean is only defined for a stationary process.
+        """
+        if self.stationary is None:
+            self.is_stationary()
+        
+        if not self.stationary:
+            return None
+            
+        return self.c / (1 - np.sum(self.phi))
+
+    def get_unconditional_std(self):
+        """
+        Calculates the unconditional variance of the AR process.
+        The variance is only defined for a stationary process.
+        """
+        if self.stationary is None:
+            self.is_stationary()
+        if not self.stationary:
+            return None
+        
+        return np.sqrt(self.sigma**2 / (1 - np.sum(self.phi**2)))
+        
+    def build_F(self):
+        """Builds the companion matrix F from the model's phi coefficients."""
+        if self.p == 0:
+            self.F = np.array([[]])
+        else:
+            top_row = self.phi.reshape(1, self.p)
+            bottom_part = np.eye(self.p - 1, self.p)
+            self.F = np.vstack([top_row, bottom_part])
+        return self.F
+    
+    def is_stationary(self):
+        """
+        Checks for stationarity by inspecting the eigenvalues of the companion matrix F.
+        A process is stationary if all eigenvalue moduli are less than 1.
+        """
+        if self.F is None:
+            self.build_F()
+        
+        if self.p == 0: # An AR(0) is stationary by definition
+            self.stationary = True
+            self.F_modules = np.array([])
+            return True, self.F_modules
+
+        eigenvalues = np.linalg.eigvals(self.F)
+        self.F_modules = np.abs(eigenvalues)
+        self.stationary = np.all(self.F_modules < 1)
+        return self.stationary, self.F_modules
     
     def get_irf(self, H=2, method='exact'):
-        if self.F is None and method == 'exact':
-            raise ValueError("Matrix F was not created. Please check variables p or F.")
-        if self.stationary:
-            raise ValueError("Process is not statitionary.")
+        """Calculates the Impulse Response Function (IRF) for H periods."""
+        # Ensure model state is calculated before proceeding
+        if self.stationary is None:
+            self.is_stationary()
+
+        if not self.stationary:
+            raise ValueError("Process is not stationary. IRF would not converge.")
         
-        print('⚙️ Using {} method'.format(method))
+        print(f'⚙️ Using {method} method')
         irf_values = np.zeros(H) # zero initialized
-        irf_values[0] = 1.0 # first IRF always 1
+        if H > 0:
+            irf_values[0] = 1.0 # first IRF always 1
 
         if method == 'exact':
+            if self.p == 0: return irf_values # IRF is 1 at h=0, 0 otherwise
             for h in range(1, H):
                 F_h = np.linalg.matrix_power(self.F, h)
                 irf_values[h] = F_h[0, 0]
 
         if method == 'simulation':
             for h in range(1, H):
-                past_values = irf_values[max(0, h - self.p) : h]
-                coeffs_to_use = self.phi.flatten()[:len(past_values)]
+                # Get the last p values of the IRF generated so far
+                past_values = irf_values[max(0, h - self.p):h]
+                # The coefficients to use depend on how many past values we have
+                coeffs_to_use = self.phi[:len(past_values)]
                 irf_values[h] = np.dot(coeffs_to_use, past_values[::-1])
-                
         return irf_values
+
+    def forward(self, inputs: float, noise: float = None):
+        noise = np.random.normal(self.mu, self.ustd)
+        FY = np.dot(self.F, inputs)
+
+        noise_vec = np.zeros_like(FY)
+        noise_vec[0] = noise
+
+        intercept_vec = np.zeros_like(FY)
+        intercept_vec[0] = self.c
+
+        output = intercept_vec + FY + noise_vec
+        return output
+    
+    def sample(self, n_samples: int, initial_values: np.ndarray = None):
+        """
+        The process is defined as:
+        y_t = c + phi_1*y_{t-1} + ... + phi_p*y_{t-p} + u_t
+        where u_t is a white noise process with standard deviation sigma.
+
+        Args:
+            n_samples (int): The number of samples to generate for the final series.
+            initial_values (np.ndarray, optional): A 1D array of p starting values.
+                                                   If None, starts with zeros. Defaults to None.
+
+        Returns:
+            np.ndarray: A 1D numpy array of size n_samples representing the generated time series.
+            f"{'Intercept (c)':<25}: {self.c}",
+            f"{'Error Std Dev (sigma)':<25}: {self.sigma}",
+        """
+        if initial_values is not None and len(initial_values) != self.p:
+            raise ValueError(f"initial_values must have length p={self.p}, but got {len(initial_values)}.")
+
+        y_init   = np.random.normal(self.mu, self.ustd, self.p)
+        y_sample = np.zeros([n_samples - self.p]) 
+        y_sample = np.concatenate((y_init, y_sample), axis=0)
+        wnoise   = np.random.normal(0, self.sigma, n_samples-self.p)
+
+        for t in range(self.p, n_samples):
+            y_curr = y_sample[t-self.p:t]
+            n_curr = wnoise[t-self.p]
+            y_next = self.forward(y_curr, noise=n_curr)
+            y_sample[t] = y_next[0]
+        return y_sample
+
+    def __str__(self):
+        """Returns a string summary of the AR model properties."""
+        if self.stationary is None:
+            self.is_stationary()
+
+        header = f"AR({self.p}) Model Summary"
+        separator = "=" * 50
+
+        summary_lines = [
+            separator,
+            f"{header:^50}",
+            separator,
+            f"{'Model Order (p)':<25}: {self.p}",
+            f"{'Intercept (c)':<25}: {self.c}",
+            f"{'Error Std Dev (sigma)':<25}: {self.sigma}",
+            f"{'Is Stationary':<25}: {self.stationary}",
+            f"{'Mu (Unc. Mean):':<25}: {round(self.mu, 2) if self.mu is not None else 'N/A'}",
+            f"{'Sigma (Unc. Std.)':<25}: {round(self.ustd, 2) if self.ustd is not None else 'N/A'}",
+        ]
+
+        if self.F_modules is not None and len(self.F_modules) > 0:
+            max_modulus = np.max(self.F_modules)
+            summary_lines.append(f"{'Max Eigenvalue Modulus':<25}: {max_modulus:.4f}")
+        
+        summary_lines.append("-" * 50)
+        summary_lines.append("Coefficients (phi):")
+        
+        if self.p > 0:
+            for i, coef in enumerate(self.phi):
+                summary_lines.append(f"  phi_{i+1:<4} = {coef: >10.4f}")
+        else:
+            summary_lines.append("  (No coefficients for AR(0) model)")
+            
+        summary_lines.append(separator)
+        
+        return "\n".join(summary_lines)
