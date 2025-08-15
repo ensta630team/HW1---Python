@@ -1,5 +1,6 @@
 import numpy as np 
 from source.utils.random import initialize_params
+from source.utils.ts import calculate_irf
 
 
 class AR:
@@ -14,7 +15,7 @@ class AR:
         self.p          = len(self.phi) if self.phi is not None else 0
         self.mu         = self.get_unconditional_mean()
         self.ustd       = self.get_unconditional_std()
-    
+
     def get_unconditional_mean(self):
         """
         Calculates the unconditional mean of the AR process.
@@ -78,29 +79,14 @@ class AR:
             raise ValueError("Process is not stationary. IRF would not converge.")
         
         print(f'⚙️ Using {method} method')
-        irf_values = np.zeros(H) # zero initialized
-        if H > 0:
-            irf_values[0] = 1.0 # first IRF always 1
-
-        if method == 'exact':
-            if self.p == 0: return irf_values # IRF is 1 at h=0, 0 otherwise
-            for h in range(1, H):
-                F_h = np.linalg.matrix_power(self.F, h)
-                irf_values[h] = F_h[0, 0]
-
-        if method == 'simulation':
-            for h in range(1, H):
-                # Get the last p values of the IRF generated so far
-                past_values = irf_values[max(0, h - self.p):h]
-                # The coefficients to use depend on how many past values we have
-                coeffs_to_use = self.phi[:len(past_values)]
-                irf_values[h] = np.dot(coeffs_to_use, past_values[::-1])
+        irf_values = calculate_irf(self.F, H, self.phi, method=method)
+        
         return irf_values
 
     def forward(self, inputs: float, noise: float = None):
         noise = np.random.normal(self.mu, self.ustd)
         FY = np.dot(self.F, inputs)
-
+        
         noise_vec = np.zeros_like(FY)
         noise_vec[0] = noise
 

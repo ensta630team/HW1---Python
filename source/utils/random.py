@@ -2,7 +2,6 @@ import numpy as np
 from numpy.polynomial.polynomial import polyfromroots
 
 
-
 DISTRIBUTION_GENERATORS = {
     'normal': lambda **kwargs: np.random.normal(
         loc=kwargs.get('mean', 0.0),      # Default mean = 0
@@ -35,7 +34,6 @@ def generate_stationary_phi(p: int) -> np.ndarray:
         roots = np.concatenate([roots, real_root])
     poly_coeffs = polyfromroots(roots)
     phi = -np.real(poly_coeffs[:-1][::-1])
-    
     return phi.reshape(1, p)
 
 def initialize_params(params_distribution, **kwargs):
