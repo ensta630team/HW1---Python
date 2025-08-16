@@ -82,20 +82,7 @@ class AR:
         irf_values = calculate_irf(self.F, H, self.phi, method=method)
         
         return irf_values
-
-    def forward(self, inputs: float, noise: float = None):
-        noise = np.random.normal(self.mu, self.ustd)
-        FY = np.dot(self.F, inputs)
-        
-        noise_vec = np.zeros_like(FY)
-        noise_vec[0] = noise
-
-        intercept_vec = np.zeros_like(FY)
-        intercept_vec[0] = self.c
-
-        output = intercept_vec + FY + noise_vec
-        return output
-    
+   
     def sample(self, n_samples: int, initial_values: np.ndarray = None):
         """
         The process is defined as:
@@ -115,16 +102,17 @@ class AR:
         if initial_values is not None and len(initial_values) != self.p:
             raise ValueError(f"initial_values must have length p={self.p}, but got {len(initial_values)}.")
 
+        # first 2 observations
         y_init   = np.random.normal(self.mu, self.ustd, self.p)
+        
         y_sample = np.zeros([n_samples - self.p]) 
         y_sample = np.concatenate((y_init, y_sample), axis=0)
         wnoise   = np.random.normal(0, self.sigma, n_samples-self.p)
-
+ 
         for t in range(self.p, n_samples):
-            y_curr = y_sample[t-self.p:t]
-            n_curr = wnoise[t-self.p]
-            y_next = self.forward(y_curr, noise=n_curr)
-            y_sample[t] = y_next[0]
+            y_prev = y_sample[t-self.p:t]
+            y_sample[t] = self.c + np.dot(self.phi, y_prev[::-1]) + wnoise[t-self.p]
+            
         return y_sample
 
     def __str__(self):
