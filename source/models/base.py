@@ -34,8 +34,9 @@ class TimeSeriesModel(ABC):
         self._is_stationary_cached = None
         self._unconditional_mean   = None
         self._unconditional_std    = None
-        self.get_unconditional_mean()
-        self.get_unconditional_std()
+
+        self._unconditional_mean = self.get_unconditional_mean()
+        self._unconditional_std  = self.get_unconditional_std()
 
     @abstractmethod
     def get_unconditional_mean(self) -> float:
