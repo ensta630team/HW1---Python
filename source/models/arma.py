@@ -139,27 +139,20 @@ class ARMA(TimeSeriesModel):
         Returns:
             np.ndarray: An array of length H containing the IRF values.
         """
-        # Extender los vectores de coeficientes a la longitud H para facilitar los cálculos
         phi_ext = np.zeros(H)
         theta_ext = np.zeros(H)
         
-        # Llenar con los valores de los coeficientes del modelo
         phi_ext[1:self.ar.p + 1] = self.ar.phi
         theta_ext[1:self.ma.q + 1] = self.ma.theta
 
-        # Inicializar el array para los valores de la IRF
         irf_values = np.zeros(H)
-        irf_values[0] = 1  # Por definición, ψ₀ = 1
+        irf_values[0] = 1 
 
-        # Calcular recursivamente los coeficientes de la IRF (ψ_j)
         for j in range(1, H):
-            # Parte AR: Suma de φ_i * ψ_{j-i}
             ar_part = np.dot(phi_ext[1:j + 1], irf_values[j-1::-1])
-            
-            # Parte MA: Coeficiente θ_j
+
             ma_part = theta_ext[j]
             
-            # ψ_j = (parte AR) + θ_j
             irf_values[j] = ar_part + ma_part
             
         return irf_values
