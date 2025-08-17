@@ -1,6 +1,6 @@
 import numpy as np
 from source.utils.sampling import initialize_params
-from source.utils.impulse import calculate_irf
+from source.utils.stats import calculate_irf
 from scipy.linalg import solve_discrete_lyapunov
 from source.models.base import TimeSeriesModel
 

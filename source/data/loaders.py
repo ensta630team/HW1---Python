@@ -29,7 +29,10 @@ def create_dataset(path, problem=3):
         i_t = df['Tasa de política'] / 100
         i_t = i_t.to_numpy()
         
+        t = df['Periodo'].dt.date
+        t = t.to_numpy()
         return {
+            't': t,
             'pi_t': pi_t,
             'y_t': y_t,
             'i_t': i_t

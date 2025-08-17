@@ -24,7 +24,9 @@ def objective_function_mle(params, y_data, p, q):
 
     # Sum of Squared Residuals
     ssr = np.sum(errors[start_t:]**2)
-    
+    if not np.isfinite(ssr):
+        return np.inf
+
     # Substract initial observations
     effective_n = n - start_t
     if effective_n <= 0 or ssr <= 1e-9: # Avoid zero div.
@@ -37,11 +39,13 @@ def objective_function_mle(params, y_data, p, q):
     # using sigma^2 = ssr / N, la fórmula se simplifica.
     log_likelihood = -effective_n / 2 * np.log(2 * np.pi) - effective_n / 2 * np.log(sigma2) - ssr / (2 * sigma2)
 
-    # Devolvemos el negativo porque el optimizador minimiza.
+    if not np.isfinite(log_likelihood):
+        return np.inf
+
     return -log_likelihood
 
 
-def maximum_likelihood_estimation(model, y_data):
+def maximum_likelihood_estimation(model, y_data, return_likelihood=False):
     """
     Fits the model using Maximum Likelihood Estimation (MLE).
     """
@@ -66,6 +70,7 @@ def maximum_likelihood_estimation(model, y_data):
         optimal_params = result.x
         phi_estimated = optimal_params[:p]
         theta_estimated = optimal_params[p:]
+        log_likelihood = -result.fun
 
         # 3. Calcular la desviación estándar (sigma) final con los parámetros óptimos
         # Para ello, necesitamos recalcular los residuos finales.
@@ -93,5 +98,8 @@ def maximum_likelihood_estimation(model, y_data):
         model_copy.ar.phi = phi_estimated
         model_copy.ma.theta = theta_estimated
         model_copy.sigma = estimated_sigma
-        
-        return model_copy
+        if return_likelihood:
+            return model_copy, log_likelihood
+        else:
+            return model_copy
+    
