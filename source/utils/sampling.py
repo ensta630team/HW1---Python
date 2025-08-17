@@ -37,10 +37,13 @@ def generate_stationary_phi(p: int) -> np.ndarray:
     return phi.reshape(1, p)
 
 def initialize_params(params_distribution, **kwargs):
+    if params_distribution is None:
+        return None
+
     if isinstance(params_distribution, (list, np.ndarray)):
         return np.array(params_distribution)
 
-    if params_distribution == 'stationary' or params_distribution is None:
+    if params_distribution == 'stationary':
         return generate_stationary_phi(kwargs.get('p', 2)).flatten()
 
     generator_func = DISTRIBUTION_GENERATORS.get(params_distribution)
