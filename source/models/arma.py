@@ -37,6 +37,12 @@ class ARMA(TimeSeriesModel):
         self.ma = MovingAverage(c, sigma, theta_params, **kwargs)
         
         super().__init__(c, sigma)
+
+    @property
+    def params(self) -> int:
+        """The order (p) of the AR component."""
+        return {'phi': self.ar.phi, 'theta': self.ma.theta}
+    
     @property
     def p(self) -> int:
         """The order (p) of the AR component."""
@@ -91,7 +97,10 @@ class ARMA(TimeSeriesModel):
         print("Warning: Unconditional std for ARMA is a complex calculation and is not implemented.")
         return np.nan
 
-    def sample(self, n_samples: int, burn_in: int = 0, **kwargs) -> np.ndarray:
+    def sample(self, n_samples: int, 
+               initial_values: np.ndarray = None, 
+               burn_in: int = 0, 
+               **kwargs) -> np.ndarray:
         """
         Generates a time series sample from the ARMA(p,q) process.
 
@@ -107,6 +116,11 @@ class ARMA(TimeSeriesModel):
         # Generate all shocks at once
         shocks = np.random.normal(loc=0, scale=self.sigma, size=total_samples)
         y_sample = np.zeros(total_samples)
+
+        if initial_values is not None:
+            if len(initial_values) != self.p:
+                raise ValueError(f"initial_values must have length p={self.p}, but got {len(initial_values)}.")
+            y_sample[:self.p] = initial_values
 
         # Determine the maximum lag needed for the loop start
         max_lag = max(self.ar.p, self.ma.q)
@@ -160,3 +174,24 @@ class ARMA(TimeSeriesModel):
     def __str__(self) -> str:
         summary_lines = self.ar.__str__() +'\n'+self.ma.__str__()
         return summary_lines
+    
+
+
+#### =========================================================
+#### =================== ARMA GRID SEARCH ====================
+#### =========================================================
+class ARMAGridSearch:
+    def __init__(self, data_series, p_max, q_max, criterion='aic'):
+        self.data = data_series
+        self.p_max = p_max
+        self.q_max = q_max
+        self.criterion = criterion
+        self.results_ = None
+        self.best_model_ = None
+
+    def fit(self):
+        pass
+
+    def summary(self):
+        # Imprimir la tabla de resultados de una forma ordenada.
+        pass

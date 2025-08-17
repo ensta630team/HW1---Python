@@ -13,3 +13,24 @@ def load_data(path):
     
     print('[INFO] Data loaded successfully!')
     return df
+
+def create_dataset(path, problem=3):
+    df = load_data(path)
+
+    if problem == 3:
+        pi_t = np.log(df['IPC'] / df['IPC'].shift(1))
+        pi_t.dropna(inplace=True)
+        pi_t = pi_t.to_numpy()
+        
+        y_t = np.log(df['IMACEC'] / df['IMACEC'].shift(1))
+        y_t.dropna(inplace=True)
+        y_t = y_t.to_numpy()
+
+        i_t = df['Tasa de política'] / 100
+        i_t = i_t.to_numpy()
+        
+        return {
+            'pi_t': pi_t,
+            'y_t': y_t,
+            'i_t': i_t
+        }
