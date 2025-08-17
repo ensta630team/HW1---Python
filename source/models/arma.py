@@ -12,7 +12,7 @@ import warnings
 
 
 
-class ARMA(TimeSeriesModel):
+class ARMA:
     """
     Implements an Autoregressive Moving Average (ARMA) model.
 
@@ -41,8 +41,12 @@ class ARMA(TimeSeriesModel):
 
         # ==== MA Setup ====
         self.ma = MovingAverage(c, sigma, theta_params, **kwargs)
-        
-        super().__init__(c, sigma)
+        self.c = c
+        self.sigma = sigma
+
+        # Inicializamos el caché para la desviación estándar
+        self._unconditional_std = None
+
 
     @property
     def params(self) -> int:
@@ -74,25 +78,14 @@ class ARMA(TimeSeriesModel):
         Checks for stationarity. An ARMA(p,q) process is stationary if its
         AR component is stationary. The MA component is always stationary.
         """
-        if self.ar.p == 0:
-            return True # Pure MA is always stationary
         return self.ar._is_stationary()
 
 
     def get_unconditional_mean(self) -> float:
         """
-        Calculates the unconditional mean of the ARMA process.
         The mean is determined only by the AR component and the constant.
-        μ = c / (1 - φ₁ - φ₂ - ... - φp)
         """
-        if not self._is_stationary():
-            return np.nan
-        
-        phi_sum = np.sum(self.ar.phi)
-        if np.isclose(phi_sum, 1.0):
-            return np.inf  # Unit root case
-            
-        return self.c / (1 - phi_sum)
+        return self.ar.get_unconditional_mean()
 
     def get_unconditional_std(self) -> float:
         """
@@ -102,40 +95,19 @@ class ARMA(TimeSeriesModel):
         Var(y_t) = sigma^2 * sum(psi_j^2 for j=0 to inf),
         where psi_j are the coefficients of the impulse response function.
         """
-        # Devolver el valor guardado en caché si ya se calculó
         if self._unconditional_std is not None:
             return self._unconditional_std
-
-        # La desviación estándar incondicional solo está definida para procesos estacionarios
         if not self._is_stationary():
             self._unconditional_std = np.inf
             return self._unconditional_std
-
-        # Caso 1: Proceso MA(q) puro (p=0). Usar la fórmula exacta y más simple.
         if self.p == 0:
-            theta_sq_sum = np.sum(self.theta**2) if self.q > 0 else 0
-            variance = self.sigma**2 * (1 + theta_sq_sum)
-            self._unconditional_std = np.sqrt(variance)
-            return self._unconditional_std
-
-        # Caso 2: Proceso AR(p) puro (q=0). Usar el método exacto de Yule-Walker de la clase AR.
+            return self.ma.get_unconditional_std()
         if self.q == 0:
-            gamma_0 = self.ar._solve_yule_walker_for_variance()
-            self._unconditional_std = np.sqrt(gamma_0)
-            return self._unconditional_std
+            return self.ar.get_unconditional_std()
             
-        # Caso 3: Proceso ARMA(p,q) mixto. Usar la aproximación con la IRF.
-        # Se necesita un horizonte suficientemente grande para que la suma de los psi^2 converja.
-        # 1000 períodos es más que suficiente para la mayoría de los procesos estacionarios.
-        H = 1000 
-
-        # Obtener los coeficientes psi (los valores de la IRF)
+        H = 1000
         psi_coeffs = self.get_irf(H=H)
-
-        # Calcular la varianza: sigma^2 * sum(psi_j^2)
         variance = self.sigma**2 * np.sum(psi_coeffs**2)
-
-        # Guardar en caché el resultado y devolverlo
         self._unconditional_std = np.sqrt(variance)
         return self._unconditional_std
 
@@ -197,26 +169,57 @@ class ARMA(TimeSeriesModel):
         """
         phi_ext = np.zeros(H)
         theta_ext = np.zeros(H)
-        
-        phi_ext[1:self.ar.p + 1] = self.ar.phi
-        theta_ext[1:self.ma.q + 1] = self.ma.theta
+
+        if self.p > 0:
+            phi_ext[1:self.p + 1] = self.phi
+        if self.q > 0:
+            theta_ext[1:self.q + 1] = self.theta
 
         irf_values = np.zeros(H)
         irf_values[0] = 1 
 
         for j in range(1, H):
-            ar_part = np.dot(phi_ext[1:j + 1], irf_values[j-1::-1])
-
-            ma_part = theta_ext[j]
-            
+            ar_part = np.dot(phi_ext[1:j + 1], irf_values[j-1::-1]) if self.p > 0 else 0
+            ma_part = theta_ext[j] if self.q > 0 else 0
             irf_values[j] = ar_part + ma_part
             
         return irf_values
     
     def __str__(self) -> str:
-        summary_lines = self.ar.__str__() +'\n'+self.ma.__str__()
-        return summary_lines
-    
+        is_stationary = self._is_stationary()
+        header = f"ARMA({self.p}, {self.q}) Model Summary"
+        separator = "=" * 50
+        
+        unc_mean = self.get_unconditional_mean()
+        self._unconditional_std = self.get_unconditional_std()
+        unc_std = self._unconditional_std
+
+        summary_lines = [
+            separator,
+            f"{header:^50}",
+            separator,
+            f"{'Is Stationary':<25}: {is_stationary}",
+            f"{'Mu (Unc. Mean)':<25}: {unc_mean:.4f}" if unc_mean is not None else "N/A",
+            f"{'Sigma (Unc. Std.)':<25}: {unc_std:.4f}" if unc_std is not None else "N/A",
+            f"{'Error Std Dev (sigma)':<25}: {self.sigma:.4f}",
+            f"{'Constant (c)':<25}: {self.c:.4f}",
+            "-" * 50, "AR Coefficients (phi):"
+        ]
+        
+        if self.p > 0:
+            for i, coef in enumerate(self.phi):
+                summary_lines.append(f"  phi_{i+1:<4} = {coef: >.4f}")
+        else:
+            summary_lines.append("  (No AR coefficients)")
+        summary_lines.append("-" * 50); summary_lines.append("MA Coefficients (theta):")
+        if self.q > 0:
+            for i, coef in enumerate(self.theta):
+                summary_lines.append(f"  theta_{i+1:<4} = {coef: >.4f}")
+        else:
+            summary_lines.append("  (No MA coefficients)")
+        summary_lines.append(separator)
+        
+        return "\n".join(summary_lines)
 
 
 #### =========================================================
@@ -259,50 +262,50 @@ class ARMAGridSearch:
         print(f"Iniciando Grid Search para {len(param_combinations)} combinaciones de ARMA(p,q)...")
         
         # 2. Iterar sobre las combinaciones con una barra de progreso tqdm
-        progress_bar = tqdm(param_combinations, 
-                            desc="Iniciando Grid Search", 
-                            unit="modelo")
-        
-        for p, q in progress_bar:
-            # 3. Actualizar la descripción de la barra de progreso en cada iteración
-            progress_bar.set_description(f"Ajustando ARMA({p},{q})")
-            try:
-                # Crear un modelo base para ajustar
-                model_to_fit = ARMA(phi_params=np.zeros(p), theta_params=np.zeros(q))
-                
-                # Ajustar el modelo y obtener la log-verosimilitud
-                fitted_model, log_likelihood = maximum_likelihood_estimation(model_to_fit, 
-                                                                                self.data,
-                                                                                return_likelihood=True)
-
-                if fitted_model is None:
-                    raise ValueError("El ajuste del modelo falló.")
-
-                # Calcular el número de parámetros (p + q + sigma^2)
-                # Si se ajustara la constante 'c', sería p + q + 2
-                k = p + q + 1 
-                
-                # Calcular AIC y BIC
-                aic = 2 * k - 2 * log_likelihood
-                bic = k * np.log(n_obs) - 2 * log_likelihood
-
-                results_list.append({
-                    'p': p,
-                    'q': q,
-                    'log_likelihood': log_likelihood,
-                    'aic': aic,
-                    'bic': bic,
-                    'model': fitted_model
-                })
+        with np.errstate(over='ignore', invalid='ignore'):
+            progress_bar = tqdm(param_combinations, 
+                                desc="Iniciando Grid Search", 
+                                unit="modelo")
             
-            except (np.linalg.LinAlgError, ValueError, IndexError) as e:
-                # Si el modelo no converge o falla, lo registramos
-                # Usamos tqdm.write para no interferir con la barra de progreso
-                tqdm.write(f"  -> Falló el ajuste para ARMA({p},{q}). Error: {e}")
-                results_list.append({
-                    'p': p, 'q': q, 'log_likelihood': np.nan, 
-                    'aic': np.nan, 'bic': np.nan, 'model': None
-                })
+            for p, q in progress_bar:
+                # 3. Actualizar la descripción de la barra de progreso en cada iteración
+                progress_bar.set_description(f"Ajustando ARMA({p},{q})")
+                try:
+                    # Crear un modelo base para ajustar
+                    model_to_fit = ARMA(phi_params=np.zeros(p), theta_params=np.zeros(q))
+                    
+                    # Ajustar el modelo y obtener la log-verosimilitud
+                    fitted_model, log_likelihood = maximum_likelihood_estimation(model_to_fit, 
+                                                                                    self.data,
+                                                                                    return_likelihood=True)
+
+                    if fitted_model is None:
+                        raise ValueError("El ajuste del modelo falló.")
+
+                    # Calcular el número de parámetros (p + q + sigma^2)
+                    k = p + q + 2 
+                    
+                    # Calcular AIC y BIC
+                    aic = 2 * k - 2 * log_likelihood
+                    bic = k * np.log(n_obs) - 2 * log_likelihood
+
+                    results_list.append({
+                        'p': p,
+                        'q': q,
+                        'log_likelihood': log_likelihood,
+                        'aic': aic,
+                        'bic': bic,
+                        'model': fitted_model
+                    })
+                
+                except (np.linalg.LinAlgError, ValueError, IndexError) as e:
+                    # Si el modelo no converge o falla, lo registramos
+                    # Usamos tqdm.write para no interferir con la barra de progreso
+                    tqdm.write(f"  -> Falló el ajuste para ARMA({p},{q}). Error: {e}")
+                    results_list.append({
+                        'p': p, 'q': q, 'log_likelihood': np.nan, 
+                        'aic': np.nan, 'bic': np.nan, 'model': None
+                    })
         
         if not results_list:
             print("La búsqueda no produjo ningún resultado válido.")
