@@ -86,3 +86,6 @@ def HannanRissanen(y_data, j_max=20, criteria='hqic'):
 
     results_df = pd.DataFrame(results).set_index(['p', 'q'])
     return best_p, best_q, arma_final, results_df
+
+def boostrap_hannan_rissanen(y_data):
+    pass
