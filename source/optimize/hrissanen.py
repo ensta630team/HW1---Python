@@ -1,13 +1,14 @@
 import numpy as np 
 from source.models.ols import OLS
 from source.models.arma import ARMA
+from source.utils.sampling import get_windows
 from source.data.preprocessing import to_X_y
 from source.optimize.likelihood import maximum_likelihood_estimation
 from tqdm import tqdm
 import matplotlib.pyplot as plt 
 import pandas as pd
 
-def HannanRissanen(y_data, j_max=20, criteria='hqic'):
+def HannanRissanen(y_data, j_max=20, criteria='hqic', verbose=True):
     n = len(y_data)
 
     X, y = to_X_y(y_data, j_max)
@@ -35,9 +36,13 @@ def HannanRissanen(y_data, j_max=20, criteria='hqic'):
     best_value = np.inf
     best_params = (None, None)
 
-    pbar = tqdm(param_combinations, 
-                total=len(param_combinations), 
-                desc="Looking for the best (p,q)")
+    if verbose:
+        pbar = tqdm(param_combinations, 
+                    total=len(param_combinations), 
+                    desc="Looking for the best (p,q)")
+    else:
+        pbar = param_combinations
+
 
     for p, q in pbar:
         X_ar = X_step2_full[:, :p] if p > 0 else np.empty((len(y_target), 0))
@@ -49,7 +54,7 @@ def HannanRissanen(y_data, j_max=20, criteria='hqic'):
         y_pred_step2 = ols_curr.predict(X_arma)
         residuals_step2 = y_target - y_pred_step2
         rss = np.sum(residuals_step2**2)
-
+        
         N = len(y_target)
         k = p + q + 1
 
@@ -68,7 +73,8 @@ def HannanRissanen(y_data, j_max=20, criteria='hqic'):
             best_params = (p, q)
 
     best_p, best_q = best_params
-    print(f"\nSearching Done! Best Model: p={best_p}, q={best_q} - {criteria}={best_value:.4f}")
+    if verbose:
+        print(f"\nSearching Done! Best Model: p={best_p}, q={best_q} - {criteria}={best_value:.4f}")
 
     # Ajustar el modelo final con los mejores parámetros encontrados
     X_ar_final = X_step2_full[:, :best_p] if best_p > 0 else np.empty((len(y_target), 0))
@@ -87,5 +93,53 @@ def HannanRissanen(y_data, j_max=20, criteria='hqic'):
     results_df = pd.DataFrame(results).set_index(['p', 'q'])
     return best_p, best_q, arma_final, results_df
 
-def boostrap_hannan_rissanen(y_data):
-    pass
+def boostrap_hannan_rissanen(y_data, 
+                             iterations=2, 
+                             j_max=20, 
+                             model=None, 
+                             criteria='hqic'):
+    
+    results_p = np.zeros([iterations, j_max+1])
+    results_q = np.zeros([iterations, j_max+1])
+
+    if model is None:
+        nobs = y_data.shape[0]
+        y_data_bs = get_windows(y_data, 
+                                n_ventanas=iterations,
+                                tamano_ventana=nobs-nobs//3)
+    pbar = tqdm(range(iterations), 
+                total=iterations, 
+                desc="Looking for the best parameters")
+    for i in pbar:
+        if model is not None:
+            y_step = model.sample(n_samples=1000, burn_in=100)
+        else:
+            y_step = y_data_bs[i]
+
+        best_p, best_q, final_model, results_df = HannanRissanen(y_step, 
+                                                                 j_max=j_max, 
+                                                                 criteria=criteria,
+                                                                 verbose=False)
+        results_p[i, best_p] +=1
+        results_q[i, best_q] +=1
+
+    median_p = np.mean(results_p, axis=0)
+    median_q = np.mean(results_q, axis=0)
+
+    best_p = np.argmax(median_p)
+    best_q = np.argmax(median_q)
+    
+    best_model = ARMA(c=final_model.c, 
+                      sigma=final_model.sigma, 
+                      phi_params=final_model.ar.phi, 
+                      theta_params=final_model.ma.theta)
+    
+    best_model = maximum_likelihood_estimation(best_model, y_data)
+
+    return {
+        'best_p': best_p,
+        'best_q': best_q,
+        'freq_p': results_p,
+        'freq_q': results_q,
+        'model': best_model
+    }

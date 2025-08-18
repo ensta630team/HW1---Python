@@ -55,3 +55,23 @@ def initialize_params(params_distribution, **kwargs):
             raise TypeError(f"Missing required keyword argument: {e} for distribution '{params_distribution}'")
     else:
         raise ValueError(f"'{params_distribution}' is not a valid value for params_distribution.")
+    
+def get_windows(serie: np.ndarray, n_ventanas: int, tamano_ventana: int) -> np.ndarray:
+    largo_serie = len(serie)
+    if tamano_ventana > largo_serie:
+        raise ValueError("El tamaño de la ventana no puede ser mayor que el largo de la serie.")
+    max_ventanas_posibles = largo_serie - tamano_ventana + 1
+    
+
+    posibles_inicios = np.arange(max_ventanas_posibles)
+    
+    inicios_elegidos = np.random.choice(
+        a=posibles_inicios,
+        size=n_ventanas,
+        replace=True
+    )
+
+    indices_ventanas = inicios_elegidos[:, np.newaxis] + np.arange(tamano_ventana)
+    ventanas = serie[indices_ventanas]
+    
+    return ventanas

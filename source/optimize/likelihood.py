@@ -15,6 +15,17 @@ def objective_function_css(params, y_data, p, q):
     c = params[0]
     phi = params[1 : 1 + p]
     theta = params[1 + p :]
+
+    # Penalizar parámetros que resultan en un modelo no estacionario o no invertible
+    # Comprobación de estacionariedad (raíces del polinomio AR fuera del círculo unitario)
+    if p > 0:
+        if np.any(np.abs(np.roots(np.r_[1, -phi])) <= 1):
+            return 1e9 # Devolver un valor muy grande
+
+    # Comprobación de invertibilidad (raíces del polinomio MA fuera del círculo unitario)
+    if q > 0:
+        if np.any(np.abs(np.roots(np.r_[1, theta])) <= 1):
+            return 1e9 # Devolver un valor muy grande
     
     n = len(y_data)
     errors = np.zeros(n)
@@ -34,27 +45,32 @@ def objective_function_css(params, y_data, p, q):
     return np.sum(errors[start_t:]**2)
 
 
-# =============================================================
-# === PASO 2: Funciones para Maximum Likelihood (MLE) ===
-# =============================================================
 def objective_function_mle(params, y_data, p, q):
-    # Esta función no necesita cambios, ya era correcta.
     c = params[0]
     phi = params[1 : 1 + p]
     theta = params[1 + p :]
-    
+
+    if p > 0:
+        if np.any(np.abs(np.roots(np.r_[1, -phi])) <= 1):
+            return np.inf # Devolver infinito para que el optimizador evite esta zona
+
+    if q > 0:
+        if np.any(np.abs(np.roots(np.r_[1, theta])) <= 1):
+            return np.inf # Devolver infinito
+
     n = len(y_data)
     errors = np.zeros(n)
-    start_t = 3#max(p, q)
+    start_t = max(p, q)
     
     for t in range(start_t, n):
         y_past = y_data[t-p:t][::-1]
         u_past = errors[t-q:t][::-1]
         ar_term = np.dot(phi, y_past) if p > 0 else 0
         ma_term = np.dot(theta, u_past) if q > 0 else 0
-        errors[t] = y_data[t] - ar_term - ma_term
+        errors[t] = y_data[t] - c - ar_term - ma_term
 
     ssr = np.sum(errors[start_t:]**2)
+    
     if not np.isfinite(ssr):
         return np.inf
 
@@ -85,11 +101,16 @@ def maximum_likelihood_estimation(model, y_data, return_likelihood=False):
         q = model_copy.q
 
         # --- PASO 1: OBTENER VALORES INICIALES CON CSS ---
-        css_initial_params = np.zeros(1 + p + q)
+        # Usar los parámetros del modelo (de Hannan-Rissanen) como valores iniciales
+        css_initial_params = np.concatenate([
+            [model_copy.c],
+            model_copy.phi,
+            model_copy.theta
+        ])
         css_result = minimize(objective_function_css,
                               css_initial_params,
                               args=(y_data, p, q),
-                              method='Nelder-Mead') # Nelder-Mead es bueno para esto
+                              method='Nelder-Mead')
         
         # Los resultados de CSS son ahora nuestros valores iniciales para MLE
         mle_initial_params = css_result.x
