@@ -298,16 +298,35 @@ def plot_hannan_rissanen_results(results, fig=None, axes=None):
         fig (matplotlib.figure.Figure, optional): A pre-existing figure. Defaults to None.
         axes (matplotlib.axes.Axes, optional): A pre-existing array of two axes. Defaults to None.
     """
-    freq_p = np.argmax(results['freq_p'], 1)
-    freq_q = np.argmax(results['freq_q'], 1)
+    freq_p = results['freq_p']
+    print(freq_p)
+    print(results['best_p'])
+    freq_q = results['freq_q']
     if fig is None or axes is None:
         fig, axes = plt.subplots(1, 2, figsize=(7, 3))
 
-    sns.kdeplot(freq_p, ax=axes[0], color='darkblue')
-    sns.kdeplot(freq_q, ax=axes[1], color='darkblue')
+    # sns.kdeplot(freq_p, ax=axes[0], color='darkblue')
+    # sns.kdeplot(freq_q, ax=axes[1], color='darkblue')
 
-    axes[0].axvline(x=results['best_p'], color='red', linestyle='--', label=f'Mejor p: {results["best_p"]}')
-    axes[1].axvline(x=results['best_q'], color='red', linestyle='--', label=f'Mejor q: {results["best_q"]}')
+    sns.barplot(x=np.arange(0, freq_p.shape[0], 1), 
+                y=freq_p, 
+                ax=axes[0], color='darkblue', alpha=0.5)
+    sns.barplot(x=np.arange(0, freq_q.shape[0], 1), 
+                y=freq_q, 
+                ax=axes[1], 
+                color='darkblue', alpha=0.5)
+    
+    axes[1].plot(results['best_q'], freq_q[results['best_q']], "*", 
+                 markersize=10, color="darkred", 
+                 label=f'Mejor q: {results["best_q"]}')
+    
+    axes[0].plot(results['best_p'], freq_p[results['best_p']], "*", 
+                 markersize=10, color="darkred", 
+                 label=f'Mejor p: {results["best_p"]}')
+    axes[0].set_xticks(np.arange(0, freq_q.shape[0], 2))
+    axes[1].set_xticks(np.arange(0, freq_q.shape[0], 2))
+    # axes[0].axvline(x=results['best_p'], color='red', linestyle='--', label=f'Mejor p: {results["best_p"]}')
+    # axes[1].axvline(x=results['best_q'], color='red', linestyle='--', label=f'Mejor q: {results["best_q"]}')
 
     # axes[0].set_title('Distribución del Mejor p', fontsize=FONT_SIZES['title'])
     # axes[1].set_title('Distribución del Mejor q', fontsize=FONT_SIZES['title'])

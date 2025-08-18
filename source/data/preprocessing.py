@@ -8,3 +8,7 @@ def to_X_y(y, p):
         X = np.column_stack([X, nuevorezago])
     Y = y[p:]
     return X, Y
+
+def split_serie(serie, limit='2023-12-01'):
+
+    pass

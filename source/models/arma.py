@@ -37,10 +37,22 @@ class ARMA:
             theta_params (list or np.ndarray, optional): Vector of MA parameters (θ coefficients).
         """
         # ==== AR Setup ====
-        self.ar = AutoRegressive(c, sigma, phi_params, **kwargs)
+        try:
+            self.ar = AutoRegressive(c, sigma, phi_params, **kwargs)
+        except:
+            sigma = .1
+            print(c, sigma, phi_params)
+            self.ar = AutoRegressive(c, sigma, phi_params, **kwargs)
 
         # ==== MA Setup ====
-        self.ma = MovingAverage(c, sigma, theta_params, **kwargs)
+        try:
+            self.ma = MovingAverage(c, sigma, theta_params, **kwargs)
+        except:
+            sigma = .1
+            self.ma = MovingAverage(c, sigma, theta_params, **kwargs)
+            print(c, sigma, theta_params)
+
+        # ==== General Setup ====
         self.c = c
         self.sigma = sigma
 
@@ -185,6 +197,88 @@ class ARMA:
             
         return irf_values
     
+    def forecast_arma(self, y_data, h: int):
+        """
+        Realiza pronósticos fuera de muestra para un modelo ARMA ajustado.
+
+        Args:
+            model (ARMA): Una instancia de la clase ARMA con los parámetros ya ajustados.
+            y_data (np.ndarray): La serie de tiempo histórica utilizada para el ajuste.
+            h (int): El horizonte de pronóstico (número de períodos a predecir).
+
+        Returns:
+            tuple: Una tupla conteniendo:
+                - forecasts (np.ndarray): Los pronósticos puntuales para h períodos.
+                - lower_bound (np.ndarray): El límite inferior del intervalo de confianza al 95%.
+                - upper_bound (np.ndarray): El límite superior del intervalo de confianza al 95%.
+        """
+        # Extraer parámetros del modelo
+        phi = self.phi if self.p > 0 else np.array([])
+        theta = self.theta if self.q > 0 else np.array([])
+        sigma = self.sigma
+        
+        n = len(y_data)
+        
+        # --- 1. Reconstruir los errores históricos ---
+        errors = np.zeros(n)
+        start_t = max(self.p, self.q)
+        for t in range(start_t, n):
+            y_past = y_data[t-self.p:t][::-1]
+            u_past = errors[t-self.q:t][::-1]
+            ar_part = np.dot(phi, y_past) if self.p > 0 else 0
+            ma_part = np.dot(theta, u_past) if self.q > 0 else 0
+            errors[t] = y_data[t] - self.c - ar_part - ma_part
+
+        # --- 2. Realizar el pronóstico recursivo ---
+        forecasts = np.zeros(h)
+        
+        # Crear arrays extendidos para facilitar la recursión
+        y_extended = np.concatenate([y_data, np.zeros(h)])
+        errors_extended = np.concatenate([errors, np.zeros(h)])
+
+        for i in range(h):
+            # El índice actual en el array extendido es n + i
+            t = n + i
+            
+            # Obtener valores pasados (pueden ser datos reales o pronósticos anteriores)
+            y_past = y_extended[t-self.p:t][::-1]
+            
+            # Obtener errores pasados (pueden ser errores reconstruidos o ceros)
+            u_past = errors_extended[t-self.q:t][::-1]
+
+            ar_part = np.dot(phi, y_past) if self.p > 0 else 0
+            ma_part = np.dot(theta, u_past) if self.q > 0 else 0
+            
+            # Calcular el pronóstico puntual
+            forecast_point = self.c + ar_part + ma_part
+            
+            # Guardar y actualizar el array extendido para la siguiente iteración
+            forecasts[i] = forecast_point
+            y_extended[t] = forecast_point
+            # errors_extended[t] permanece como 0, que es E[u_t]
+
+        # --- 3. Calcular los intervalos de confianza ---
+        # La varianza del error de pronóstico depende de la IRF (coeficientes psi)
+        irf_coeffs = self.get_irf(H=h)
+        
+        # Varianza del error de pronóstico acumulada
+        forecast_error_var = np.zeros(h)
+        psi_sq_sum = 0
+        for i in range(h):
+            psi_sq_sum += irf_coeffs[i]**2
+            forecast_error_var[i] = sigma**2 * psi_sq_sum
+        
+        # Desviación estándar del error de pronóstico
+        forecast_se = np.sqrt(forecast_error_var)
+        
+        # Intervalo de confianza al 95% (usando z=1.96 para la normal)
+        z_score = 1.96
+        lower_bound = forecasts - z_score * forecast_se
+        upper_bound = forecasts + z_score * forecast_se
+
+        return forecasts, lower_bound, upper_bound
+
+
     def __str__(self) -> str:
         is_stationary = self._is_stationary()
         header = f"ARMA({self.p}, {self.q}) Model Summary"
@@ -220,6 +314,3 @@ class ARMA:
         summary_lines.append(separator)
         
         return "\n".join(summary_lines)
-
-
-#### =========================================================

@@ -123,12 +123,14 @@ def boostrap_hannan_rissanen(y_data,
         results_p[i, best_p] +=1
         results_q[i, best_q] +=1
 
-    median_p = np.mean(results_p, axis=0)
-    median_q = np.mean(results_q, axis=0)
-
-    best_p = np.argmax(median_p)
-    best_q = np.argmax(median_q)
     
+    freq_p = np.sum(results_p, axis=0)
+    freq_q = np.sum(results_q, axis=0)
+
+    # take the mode 
+    best_p = np.argmax(freq_p)
+    best_q = np.argmax(freq_q)
+
     best_model = ARMA(c=final_model.c, 
                       sigma=final_model.sigma, 
                       phi_params=final_model.ar.phi, 
@@ -139,7 +141,7 @@ def boostrap_hannan_rissanen(y_data,
     return {
         'best_p': best_p,
         'best_q': best_q,
-        'freq_p': results_p,
-        'freq_q': results_q,
+        'freq_p': freq_p,
+        'freq_q': freq_q,
         'model': best_model
     }

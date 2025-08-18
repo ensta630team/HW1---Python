@@ -100,8 +100,6 @@ def maximum_likelihood_estimation(model, y_data, return_likelihood=False):
         p = model_copy.p
         q = model_copy.q
 
-        # --- PASO 1: OBTENER VALORES INICIALES CON CSS ---
-        # Usar los parámetros del modelo (de Hannan-Rissanen) como valores iniciales
         css_initial_params = np.concatenate([
             [model_copy.c],
             model_copy.phi,
@@ -112,16 +110,13 @@ def maximum_likelihood_estimation(model, y_data, return_likelihood=False):
                               args=(y_data, p, q),
                               method='Nelder-Mead')
         
-        # Los resultados de CSS son ahora nuestros valores iniciales para MLE
         mle_initial_params = css_result.x
-        
-        # --- PASO 2: REFINAR CON MLE ---
+
         result = minimize(objective_function_mle,
-                          mle_initial_params, # <-- Usando los mejores valores iniciales
+                          mle_initial_params,
                           args=(y_data, p, q),
                           method='BFGS')
 
-        # El resto del código para extraer y actualizar el modelo es el mismo
         optimal_params = result.x
         c_estimated = optimal_params[0]
         phi_estimated = optimal_params[1:1+p]
