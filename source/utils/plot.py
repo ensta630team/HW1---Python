@@ -350,3 +350,64 @@ def plot_hannan_rissanen_results(results, fig=None, axes=None):
         ax.tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
 
     return fig, axes
+
+
+def plot_bootstrap_kde(bootstrap_results: dict, fig=None, axes=None):
+    """
+    Visualiza la distribución de los órdenes p y q del bootstrap
+    usando gráficos de Densidad de Kernel (KDE).
+
+    Args:
+        bootstrap_results (dict): El diccionario devuelto por la función
+                                  `parametric_bootstrap_hr`.
+        fig (matplotlib.figure.Figure, optional): Figura preexistente.
+        axes (matplotlib.axes.Axes, optional): Array de dos ejes preexistente.
+    """
+    # 1. Validación y extracción de datos
+    if 'param_distribution' not in bootstrap_results:
+        raise ValueError("La entrada debe ser el diccionario de resultados de la función de bootstrap.")
+
+    dist_df = bootstrap_results['param_distribution']
+    best_p = bootstrap_results['best_p']
+    best_q = bootstrap_results['best_q']
+    
+    # 2. Reconstruir las listas completas de todos los p y q encontrados
+    #    Esto es necesario para que el KDE pueda estimar la densidad.
+    all_p = []
+    all_q = []
+    for _, row in dist_df.iterrows():
+        p, q = row['(p,q)']
+        frequency = int(row['frequency'])
+        all_p.extend([p] * frequency)
+        all_q.extend([q] * frequency)
+
+    # 3. Creación de los gráficos
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+
+    # --- Gráfico para p ---
+    sns.kdeplot(x=all_p, ax=axes[0], color='darkblue', linewidth=2.5, fill=True, alpha=0.1)
+    axes[0].axvline(x=best_p, color='red', linestyle='--', linewidth=2, label=f'Mejor p: {best_p}')
+    axes[0].set_title('Distribución del Mejor p', fontsize=FONT_SIZES['title'])
+    axes[0].set_xlabel('Orden AR (p)', fontsize=FONT_SIZES['label'])
+    axes[0].set_ylabel('Densidad', fontsize=FONT_SIZES['label'])
+    axes[0].legend(fontsize=FONT_SIZES['legend'])
+    axes[0].grid(True, which='both', linestyle=':', linewidth=0.7)
+    axes[0].tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+    axes[0].set_xlim(left=-0.5) # Asegurar que el eje no empiece en negativo
+
+    # --- Gráfico para q ---
+    sns.kdeplot(x=all_q, ax=axes[1], color='darkblue', linewidth=2.5, fill=True, alpha=0.1)
+    axes[1].axvline(x=best_q, color='red', linestyle='--', linewidth=2, label=f'Mejor q: {best_q}')
+    axes[1].set_title('Distribución del Mejor q', fontsize=FONT_SIZES['title'])
+    axes[1].set_xlabel('Orden MA (q)', fontsize=FONT_SIZES['label'])
+    axes[1].set_ylabel('Densidad', fontsize=FONT_SIZES['label'])
+    axes[1].legend(fontsize=FONT_SIZES['legend'])
+    axes[1].grid(True, which='both', linestyle=':', linewidth=0.7)
+    axes[1].tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+    axes[1].set_xlim(left=-0.5)
+
+    plt.tight_layout()
+    plt.show()
+    
+    return fig, axes

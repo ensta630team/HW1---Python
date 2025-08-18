@@ -55,14 +55,19 @@ class AutoRegressive(TimeSeriesModel):
         """
         Calculates the unconditional standard deviation of the process by solving
         the Yule-Walker equations to find the variance (gamma_0).
+        VERSIÓN CORREGIDA: Maneja numéricamente varianzas negativas.
         """
-        if not self._is_stationary:
+        if not self._is_stationary():
             return np.inf
         
         if self._unconditional_std is None:
             # Cache the result to avoid re-calculating
             gamma_0 = self._solve_yule_walker_for_variance()
-            self._unconditional_std = np.sqrt(gamma_0)
+            if gamma_0 < 0:
+                self._unconditional_std = 0.0
+            else:
+                self._unconditional_std = np.sqrt(gamma_0)
+            # ==========================================
         
         return self._unconditional_std
 
@@ -123,7 +128,7 @@ class AutoRegressive(TimeSeriesModel):
         Constructs the companion matrix F for the AR(p) process
         """
         if self.p == 0:
-            return np.array([[]])
+            return np.empty((0, 0))
             
         F = np.zeros((self.p, self.p))
         # The first row contains the phi coefficients
@@ -158,6 +163,9 @@ class AutoRegressive(TimeSeriesModel):
         return gamma_0
  
     def _check_stationarity(self) -> bool:
+        if self.p == 0:
+            return True
+            
         F = self._build_F_matrix()
         eigenvalues = np.linalg.eigvals(F)
         return np.all(np.abs(eigenvalues) < 1)
