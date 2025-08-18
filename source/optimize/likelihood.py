@@ -45,7 +45,7 @@ def objective_function_mle(params, y_data, p, q):
     
     n = len(y_data)
     errors = np.zeros(n)
-    start_t = max(p, q)
+    start_t = 3#max(p, q)
     
     for t in range(start_t, n):
         y_past = y_data[t-p:t][::-1]

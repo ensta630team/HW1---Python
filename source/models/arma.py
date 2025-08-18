@@ -276,8 +276,8 @@ class ARMAGridSearch:
                     
                     # Ajustar el modelo y obtener la log-verosimilitud
                     fitted_model, log_likelihood = maximum_likelihood_estimation(model_to_fit, 
-                                                                                    self.data,
-                                                                                    return_likelihood=True)
+                                                                                 self.data,
+                                                                                 return_likelihood=True)
 
                     if fitted_model is None:
                         raise ValueError("El ajuste del modelo falló.")
