@@ -1,7 +1,7 @@
 import numpy as np
-from source.utils.bootstrap import remuestracion
-from source.models.Inferencia import Inferencia_OLS
-from source.utils.criticos import valores_criticos
+from source.extention.pregunta2.source.utils.bootstrap import remuestracion
+from source.extention.pregunta2.source.models.Inferencia import Inferencia_OLS
+from source.extention.pregunta2.source.utils.criticos import valores_criticos
 
 class Bootstrap:
     def __init__(self, muestra=None, rezagos=None, n=None, **kwargs):

@@ -4,11 +4,11 @@ import scipy.stats as stats
 import statsmodels.distributions.empirical_distribution as ECDF
 plt.rcParams['text.usetex'] = False  # forzar MathText
 
-from source.models.autoregressive import AR
-from source.utils import plot as uplot
-from source.models.Inferencia import Inferencia_OLS
-from source.models.bootstrap import Bootstrap
-from source.utils.criticos import valores_criticos
+from source.extention.pregunta2.source.models.autoregressive import AR
+from source.extention.pregunta2.source.utils import plot as uplot
+from source.extention.pregunta2.source.models.Inferencia import Inferencia_OLS
+from source.extention.pregunta2.source.models.bootstrap import Bootstrap
+from source.extention.pregunta2.source.utils.criticos import valores_criticos
 
 def graficopdf(densidad: list): 
 

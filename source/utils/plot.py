@@ -530,3 +530,71 @@ def plot_irf(irf_values: np.ndarray, model=None, model_name: str = "ARMA", fig=N
     plt.show()
 
     return fig, ax
+
+
+def plot_empirical_distribution(mean_samples: np.ndarray, 
+                                var_samples: np.ndarray, 
+                                model_name: str = "", 
+                                fig=None, axes=None):
+    """
+    Plots the empirical distributions of sample means and variances.
+
+    Creates two subplots showing histograms of the provided sample means
+    and sample variances, which is useful for Monte Carlo simulations.
+
+    Args:
+        mean_samples (np.ndarray): A 1D array of sample means from simulations.
+        var_samples (np.ndarray): A 1D array of sample variances from simulations.
+        model_name (str, optional): The name of the model for the titles.
+        fig (matplotlib.figure.Figure, optional): A pre-existing figure.
+        axes (matplotlib.axes.Axes, optional): A pre-existing array of two axes.
+    """
+    # 1. Create the figure and axes if not provided
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(1, 2, figsize=(14, 6))
+    
+    ax1, ax2 = axes
+
+    # --- 2. Subplot 1: Empirical Distribution of the Mean ---
+    ax1.hist(mean_samples, 
+             bins=50, 
+             density=True, 
+             alpha=0.7, 
+             color='darkblue', 
+             label='Densidad Empírica')
+    
+    ax1.set_xlabel('Valor de la Media Muestral', fontsize=FONT_SIZES['label'])
+    ax1.set_ylabel('Densidad', fontsize=FONT_SIZES['label'])
+    ax1.set_title(f'Distribución Empírica de la Media\n{model_name}', 
+                  fontsize=FONT_SIZES['title'], weight='bold')
+    ax1.legend(fontsize=FONT_SIZES['legend'])
+    ax1.grid(True, which='both', linestyle=':', linewidth=0.7)
+    ax1.tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+    
+    # Optional: Add a vertical line for the true mean if known
+    # ax1.axvline(x=true_mean, color='red', linestyle='--', label='Media Teórica')
+
+    # --- 3. Subplot 2: Empirical Distribution of the Variance ---
+    ax2.hist(var_samples, 
+             bins=50, 
+             density=True, 
+             alpha=0.7, 
+             color='darkgreen', 
+             label='Densidad Empírica')
+             
+    ax2.set_xlabel('Valor de la Varianza Muestral', fontsize=FONT_SIZES['label'])
+    ax2.set_ylabel('Densidad', fontsize=FONT_SIZES['label'])
+    ax2.set_title(f'Distribución Empírica de la Varianza\n{model_name}', 
+                  fontsize=FONT_SIZES['title'], weight='bold')
+    ax2.legend(fontsize=FONT_SIZES['legend'])
+    ax2.grid(True, which='both', linestyle=':', linewidth=0.7)
+    ax2.tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+
+    # Optional: Add a vertical line for the true variance if known
+    # ax2.axvline(x=true_variance, color='red', linestyle='--', label='Varianza Teórica')
+    
+    # 4. Final adjustments
+    fig.tight_layout(pad=2.0)
+    plt.show()
+
+    return fig, axes

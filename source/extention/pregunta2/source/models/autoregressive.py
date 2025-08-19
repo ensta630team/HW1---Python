@@ -1,6 +1,6 @@
 import numpy as np 
-from source.utils.random import initialize_params
-from source.utils.ts import calculate_irf
+from source.extention.pregunta2.source.utils.random import initialize_params
+from source.extention.pregunta2.source.utils.ts import calculate_irf
 
 
 class AR:

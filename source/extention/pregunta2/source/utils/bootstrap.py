@@ -1,6 +1,6 @@
 import numpy as np
 import random
-from source.models.Inferencia import Inferencia_OLS
+from source.extention.pregunta2.source.models.Inferencia import Inferencia_OLS
 
 def remuestracion(muestra: list, rezagos = int):
     muestra = muestra
