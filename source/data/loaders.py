@@ -37,3 +37,5 @@ def create_dataset(path, problem=3):
             'y_t': y_t,
             'i_t': i_t
         }
+    if problem == 4: 
+        return df

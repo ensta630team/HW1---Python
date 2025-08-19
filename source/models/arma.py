@@ -38,11 +38,11 @@ class ARMA:
         """
         # ==== AR Setup ====
         try:
-            self.ar = AutoRegressive(c, sigma, phi_params, **kwargs)
+            self.ar = AutoRegressive(c, sigma, params_distribution=phi_params, **kwargs)
         except:
             sigma = .1
             print(c, sigma, phi_params)
-            self.ar = AutoRegressive(c, sigma, phi_params, **kwargs)
+            self.ar = AutoRegressive(c, sigma, params_distribution=phi_params, **kwargs)
 
         # ==== MA Setup ====
         try:

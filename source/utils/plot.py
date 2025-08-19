@@ -411,3 +411,122 @@ def plot_bootstrap_kde(bootstrap_results: dict, fig=None, axes=None):
     plt.show()
     
     return fig, axes
+
+def plot_forecast(train_t, train_y, test_t, test_y, forecasts, lower_ci, upper_ci, 
+                  model_name="ARMA", fig=None, axes=None):
+    """
+    Crea un gráfico con dos subplots para visualizar los pronósticos y los residuos.
+    También calcula y muestra el RMSE y el R-cuadrado.
+
+    Args:
+        train_t, train_y: Datos de tiempo y valores de entrenamiento.
+        test_t, test_y: Datos de tiempo y valores reales de prueba.
+        forecasts, lower_ci, upper_ci: Pronósticos y sus intervalos de confianza.
+        model_name (str): Nombre del modelo para el título.
+        fig, axes: Figura y ejes preexistentes (opcional).
+    """
+    # 1. Creación de la figura y los ejes si no se proporcionan
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True, 
+                                 gridspec_kw={'height_ratios': [3, 1]})
+
+    # --- 2. Subplot 1: Pronóstico vs. Valores Reales ---
+    ax1 = axes[0]
+    
+    ax1.plot(train_t, train_y, label='Datos de Entrenamiento', color='black', linewidth=1.5)
+    ax1.plot(test_t, test_y, marker='o', label='Valores Reales (Prueba)', color='darkred', linestyle='', markersize=3)
+    ax1.plot(test_t, forecasts, label='Pronóstico Puntual', color='blue', linestyle='--')
+    ax1.fill_between(test_t, lower_ci, upper_ci, color='blue', alpha=0.2, label='Intervalo de Confianza (95%)')
+    
+    ax1.set_title(f'Pronóstico del Modelo {model_name}', fontsize=FONT_SIZES['title'], weight='bold')
+    ax1.set_ylabel('Valor de la Serie', fontsize=FONT_SIZES['label'])
+    ax1.legend(fontsize=FONT_SIZES['legend'])
+    ax1.grid(True, which='both', linestyle=':', linewidth=0.7)
+    ax1.tick_params(axis='y', which='major', labelsize=FONT_SIZES['tick'])
+    
+    # --- 3. Calcular Residuos y Métricas de Error ---
+    residuals = test_y - forecasts
+    
+    # Error Cuadrático Medio (Root Mean Squared Error - RMSE)
+    rmse = np.sqrt(np.mean(residuals**2))
+    
+    # Coeficiente de Determinación (R-cuadrado)
+    ss_res = np.sum(residuals**2)
+    ss_tot = np.sum((test_y - np.mean(test_y))**2)
+    r2 = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+    
+    # Añadir las métricas al título del subplot de pronóstico
+    ax1.set_title(
+        f'Pronóstico del Modelo {model_name}\nRMSE: {rmse:.4f} | R²: {r2:.4f}',
+        fontsize=FONT_SIZES['title'], weight='bold'
+    )
+    
+    # --- 4. Subplot 2: Análisis de Residuos ---
+    ax2 = axes[1]
+    
+    # Graficar los residuos a lo largo del tiempo
+    ax2.stem(test_t, residuals, basefmt="black", linefmt='grey', markerfmt='D')
+    ax2.axhline(y=0, color='red', linestyle='--', linewidth=1.5)
+    
+    ax2.set_title('Residuos del Pronóstico', fontsize=FONT_SIZES['title']-2)
+    ax2.set_xlabel('Fecha', fontsize=FONT_SIZES['label'])
+    ax2.set_ylabel('Error', fontsize=FONT_SIZES['label'])
+    ax2.grid(True, which='both', linestyle=':', linewidth=0.7)
+    ax2.tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+    
+    # Mejorar la visualización de las fechas en el eje x
+    fig.autofmt_xdate()
+    plt.tight_layout(pad=2.0)
+    plt.show()
+
+    return fig, axes
+
+
+def plot_irf(irf_values: np.ndarray, model=None, model_name: str = "ARMA", fig=None, ax=None):
+    """
+    Plots the Impulse Response Function (IRF) for a time series model.
+
+    Args:
+        irf_values (np.ndarray): A 1D array containing the IRF values for each period.
+        model_name (str, optional): The name of the model (e.g., "ARMA(2,1)")
+                                    to be displayed in the title. Defaults to "ARMA".
+        fig (matplotlib.figure.Figure, optional): A pre-existing figure.
+        ax (matplotlib.axes.Axes, optional): A pre-existing axis to plot on.
+    """
+    # 1. Input validation
+    if not isinstance(irf_values, np.ndarray) or irf_values.ndim != 1:
+        raise TypeError("irf_values must be a 1D numpy array.")
+        
+    H = len(irf_values)
+    periods = np.arange(H)
+
+    # 2. Create the figure and axis if not provided
+    if fig is None or ax is None:
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+    # 3. Create the plot
+    ax.plot(periods, irf_values,
+            'o-',  # Line with circle markers
+            label='Respuesta al Impulso',
+            linewidth=2,
+            markersize=4,
+            color='darkblue')
+
+    # 4. Add a horizontal line at zero
+    ax.axhline(0, color='black', linestyle='--', linewidth=1.0)
+    
+    # 5. Styling and labels
+    ax.set_title(f'Función de Impulso-Respuesta (IRF) \n Para Modelo {model_name}({model.q}, {model.p})',
+                 fontsize=FONT_SIZES['title'], weight='bold')
+    ax.set_xlabel(r'Períodos (Horizonte $H$)', fontsize=FONT_SIZES['label'])
+    ax.set_ylabel(r'Respuesta de $y_t$ a un shock de $u_t$', fontsize=FONT_SIZES['label'])
+    ax.grid(True, which='both', linestyle=':', linewidth=0.7)
+    ax.tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+    
+    # Set x-axis limits to be tight
+    ax.set_xlim(left=-1, right=H)
+    
+    plt.tight_layout()
+    plt.show()
+
+    return fig, ax
