@@ -10,7 +10,7 @@ from source.utils.sampling import get_windows
 from source.optimize.hrissanen import HannanRissanen
 from source.optimize.likelihood import maximum_likelihood_estimation
 
-def _bootstrap_iteration(y_series, j_max, criteria):
+def _bootstrap_iteration(y_series, j_max, criteria, ols_on=False):
     """
     Performs a single iteration of the Hannan-Rissanen order selection.
 
@@ -31,7 +31,8 @@ def _bootstrap_iteration(y_series, j_max, criteria):
         p, q, initial_model, _ = HannanRissanen(y_series, 
                                                 j_max=j_max, 
                                                 criteria=criteria, 
-                                                verbose=False)
+                                                verbose=False,
+                                                fran=ols_on)
         return p, q, initial_model
     except Exception:
         # If any error occurs during the estimation for a specific sample,
@@ -44,6 +45,7 @@ def parallel_bootstrap_hr(y_data,
                           sampling='windows',
                           model_generator=None, 
                           criteria='bic', 
+                          ols_on=False,
                           n_jobs=-1):
     """
     Finds the most stable ARMA(p,q) orders using a parallelized bootstrap.
@@ -103,7 +105,7 @@ def parallel_bootstrap_hr(y_data,
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         results = Parallel(n_jobs=n_jobs)(
-            delayed(_bootstrap_iteration)(series, j_max, criteria) 
+            delayed(_bootstrap_iteration)(series, j_max, criteria, ols_on) 
             for series in tqdm(bootstrap_series, desc="Processing bootstrap iterations")
         )
     

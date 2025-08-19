@@ -114,8 +114,7 @@ def HannanRissanen(y_data, j_max=20, criteria='bic', verbose=False, fran=False):
     if verbose:
         print(f"\nFast search complete! Best OLS Model: ARMA({best_p},{best_q}). Refining with MLE...")
 
-    # hacer los 2 
-    if fran:
+    if fran: # idea del fran
         final_models = []
         final_likeli = []
         for i in range(3):
