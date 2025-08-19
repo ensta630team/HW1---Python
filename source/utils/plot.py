@@ -598,3 +598,62 @@ def plot_empirical_distribution(mean_samples: np.ndarray,
     plt.show()
 
     return fig, axes
+
+
+def plot_simulation_paths(simulation_data: np.ndarray, 
+                           model_name: str = "", 
+                           num_paths_to_plot: int = 3,
+                           fig=None, axes=None):
+    """
+    Plots a specified number of simulation paths from a data array.
+
+    Each column in the input array is treated as a separate simulation path.
+    This function will create subplots to display the first `num_paths_to_plot`.
+
+    Args:
+        simulation_data (np.ndarray): A 2D numpy array where each column
+            represents a different simulation path. Shape: (n_samples, n_simulations).
+        model_name (str, optional): The name of the model for the main title.
+        num_paths_to_plot (int, optional): The number of paths to display.
+            Defaults to 3.
+        fig (matplotlib.figure.Figure, optional): A pre-existing figure.
+        axes (matplotlib.axes.Axes, optional): A pre-existing array of axes.
+    """
+    # 1. Input validation
+    if not isinstance(simulation_data, np.ndarray) or simulation_data.ndim != 2:
+        raise TypeError("simulation_data must be a 2D numpy array.")
+    
+    # Ensure we don't try to plot more paths than available
+    num_paths_to_plot = min(num_paths_to_plot, simulation_data.shape[1])
+
+    # 2. Create the figure and axes if not provided
+    if fig is None or axes is None:
+        fig, axes = plt.subplots(1, num_paths_to_plot, 
+                                 figsize=(5 * num_paths_to_plot, 4), 
+                                 sharey=True)
+    
+    # If there's only one subplot, axes might not be an array, so we wrap it
+    if num_paths_to_plot == 1:
+        axes = [axes]
+
+    # 3. Create the plots in a loop
+    for i in range(num_paths_to_plot):
+        ax = axes[i]
+        path_data = simulation_data[:, i]
+        
+        ax.plot(path_data, color='darkblue', linewidth=1.5)
+        ax.set_title(f'Serie {i + 1}', fontsize=FONT_SIZES['title'] - 2)
+        ax.grid(True, which='both', linestyle=':', linewidth=0.7)
+        ax.tick_params(axis='both', which='major', labelsize=FONT_SIZES['tick'])
+        
+        # Add labels only to the outer plots to avoid clutter
+        if i == 0:
+            ax.set_ylabel('Valor', fontsize=FONT_SIZES['label'])
+        
+        # Center the x-axis label for all subplots
+        ax.set_xlabel('Período', fontsize=FONT_SIZES['label'])
+
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.96]) # Adjust layout to make space for suptitle
+
+    return fig, axes
